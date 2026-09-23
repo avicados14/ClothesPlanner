@@ -1,44 +1,38 @@
 # Wearwise
 
-Wearwise is a private, weather-aware digital wardrobe planner. Add photographs of real clothing from a phone or computer, import direct product image links, and use the server-side stylist to create an outfit from the pieces you own.
+Wearwise is a **local-first, weather-aware wardrobe planner** published from this GitHub repository. The active application is the GitHub Pages site built from `pages/`. It keeps private wardrobe additions, laundry status, and planned-outfit history in the browser’s IndexedDB database rather than a hosted account or remote database.
 
-## First release
+## What the GitHub Pages app does
 
-- **Personal wardrobe**: Manus OAuth keeps each wardrobe private, while images are stored securely in project storage rather than the database.
-- **Photo and product-link import**: Add a garment from a device image or a public, direct image URL. AI suggests a practical name, category, color, season, and formality.
-- **Weather-aware styling**: Use device location to obtain current conditions in **Fahrenheit**, then request a look for everyday wear, the office, a date night, weekend, or travel.
-- **Laundry-aware planning**: Every garment has a stable numerical ID and a clean/dirty state. Adding an AI look to a date marks exactly those pieces dirty, and the stylist excludes them until the explicit Laundry reset is used.
-- **Wear history**: Each planned look is retained as a dated immutable snapshot and is available as versioned, downloadable JSON.
-- **Responsive workspace**: The experience is designed for a phone first but remains comfortable on a larger screen.
+- Starts with the public visual catalog stored in this repository.
+- Assigns a stable numerical ID to every garment, including new local photo imports.
+- Stores browser-added images, clean/dirty status, and dated outfit history locally in IndexedDB.
+- Produces deterministic, weather-aware looks from clean pieces only.
+- Marks planned garments as dirty and excludes them from later recommendations until **Run laundry** is selected.
+- Exports and restores the entire local closet as `wearwise.local-backup/v1` JSON.
+- Uses Fahrenheit weather for Golden, Colorado by default, with an optional device-location refresh.
 
-## GitHub Pages companion
+## Privacy boundary
 
-The repository publishes a static wardrobe companion from `pages/` to GitHub Pages. It contains the supplied Threadbeast crop set, displays weather in Fahrenheit, supports client-side category filtering, and can generate a simple local outfit prompt.
+The GitHub Pages edition does **not** use Manus authentication, a Manus database, Manus file storage, or an OpenAI/ChatGPT key. New garment photos and planning history do not upload to GitHub Pages or a Manus service. See [the local-first architecture guide](LOCAL_FIRST.md) for the exact data boundary, backup instructions, and the route to a future secure server-based upgrade.
 
-GitHub Pages is a static hosting platform. The full authenticated Wearwise product—including secure user uploads, private database records, sign-in, and the server-side AI stylist—continues to require the managed application host. The GitHub Pages view is deliberately a read-only public companion, not a replacement for the private app.
+## Repository layout
 
-## Architecture
+| Path | Purpose |
+| --- | --- |
+| `pages/` | Self-contained static GitHub Pages application and public starter catalog. |
+| `.github/workflows/ci.yml` | Type-checks, tests, builds, and deploys the `pages/` directory to GitHub Pages. |
+| `LOCAL_FIRST.md` | Data-location, backup, restore, and future-upgrade guidance. |
+| `AI_INTEGRATION.md` | Secure ChatGPT/OpenAI requirements for a future server-backed upgrade. |
 
-The private application uses Vite, React, TypeScript, Tailwind CSS, Express, tRPC, Drizzle, MySQL/TiDB, Manus OAuth, protected S3-compatible project storage, and a server-side built-in LLM. The web client never receives the database or AI credentials.
-
-## Local development
-
-```bash
-pnpm install
-pnpm dev
-```
-
-The managed WebDev runtime injects the database, OAuth, storage, and LLM environment variables. For normal development within Manus, open the project preview instead of manually setting those values.
-
-## Quality checks
+## Local preview
 
 ```bash
-pnpm check
-pnpm test
-pnpm build
-python3 /home/ubuntu/wearwise_smoke.py
+python3 -m http.server 4173 --directory pages
 ```
 
-## Deliberately next
+Then visit `http://127.0.0.1:4173` in a browser. The browser will create its own isolated local closet. Use the built-in JSON backup before clearing browser data or moving to a different device.
 
-The database already includes tables for saved outfits and planned outfit dates, but the first release focuses on cataloging and immediate weather-aware recommendations. Folder/bulk import, editable item metadata, saving generated outfits, a calendar, packing lists, and a native mobile client can now build on this foundation.
+## Future capabilities
+
+The repository retains earlier prototype code for a managed server-backed version, but the deployed Pages application does not call it. A future privacy-preserving upgrade can import the same JSON backup format into a separate secure API and database if cross-device sync or direct ChatGPT recommendations become necessary.
