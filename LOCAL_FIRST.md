@@ -1,33 +1,23 @@
-# Local-First Wearwise on GitHub Pages
+# Local-First Migration Notes
 
-The GitHub Pages edition of Wearwise is the active personal wardrobe experience. It is a static site that runs entirely in the browser. The public starter catalog is versioned in this repository under `pages/`; all new clothing photos, generated local numerical IDs, clean-or-dirty laundry state, and wear history are stored in the browser’s IndexedDB database.
+Wearwise began as a browser-only GitHub Pages application. That mode used IndexedDB to keep added garments, laundry status, and history on one browser profile. The current release has moved to authenticated Supabase synchronization so the same private wardrobe can follow the same signed-in person across devices.
 
-## Data boundaries
+## Migration status
 
-| Data | Storage location | Sent to a server? |
+| Capability | Browser-only edition | Current Supabase edition |
 | --- | --- | --- |
-| Starter garment images | This GitHub repository and GitHub Pages | Public repository assets only |
-| Added garment photos | IndexedDB in the browser that imported them | No |
-| Garment IDs and metadata | IndexedDB in the browser | No |
-| Laundry status and dated outfit history | IndexedDB in the browser | No |
-| JSON backup files | Downloaded to the user’s device | No |
-| Weather | Browser request to Open-Meteo for Golden, Colorado or device location | Yes, only the forecast request |
-| ChatGPT/OpenAI key | Not supported in the GitHub Pages edition | No key is stored or used |
+| Add garment photos | IndexedDB on one device | Private Supabase Storage bucket |
+| Garment metadata and laundry | IndexedDB on one device | Per-user database rows with RLS |
+| Wear history | IndexedDB on one device | Per-user database rows with RLS |
+| Device sync | Manual JSON export and restore | Automatic after email magic-link sign-in |
+| Recommendation API key | Not supported securely | Reserved for a future server-side Edge Function |
 
-> **Important:** Browser-local data is specific to each browser profile and device. Clearing browser data, using private/incognito mode, or changing devices can remove access to the local closet unless a JSON backup has been exported.
+## Existing local backups
 
-## Backup and move to another device
+Keep any downloaded `wearwise.local-backup/v1` files. They remain useful as an offline backup during the transition. The new account import flow will accept those backups in a follow-up migration step; in the meantime, the starter-catalog importer and private photo upload cover a clean new account.
 
-Open **Plan → Download JSON** to create a portable backup containing items, image data, laundry state, and wear history. On the other device, open the same GitHub Pages site and choose **Restore JSON**. Restore intentionally replaces the local closet in that browser after confirmation.
+## Security boundary
 
-## Current privacy posture
+The legacy browser-only approach was useful when no remote service was connected. The current system retains the same privacy goal through authenticated access controls: private rows and private image files are restricted to the account that owns them. GitHub Pages does not bundle private photos, plans, or storage credentials.
 
-The GitHub Pages application contains no OpenAI key, provider token, server-side database request, image upload endpoint, or authentication request. Its code can be developed directly in this repository. No backend is used by the local-first interface.
-
-## Future secure upgrade
-
-For cross-device synchronization or ChatGPT recommendations, a separate secure service is required because a public static site cannot protect an API key. The local backup format is versioned as `wearwise.local-backup/v1` so a future service can import it without changing the closet model. That upgrade should use a server-side secret manager, a private per-user database, and an `OPENAI_API_KEY` that never reaches browser JavaScript or the Git history.
-
-## Working on the project from GitHub
-
-The deployed static application is contained in the `pages/` folder. The GitHub Actions workflow verifies the repository and publishes that folder to GitHub Pages. Local garment photos are intentionally not committed automatically; export a JSON backup if you want to move a personal local wardrobe between browsers or devices.
+For deployment and account setup details, see [MULTI_DEVICE_SETUP.md](MULTI_DEVICE_SETUP.md).
