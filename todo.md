@@ -9,10 +9,8 @@
 - [x] Add a **Laundry** reset that marks the entire closet clean.
 - [x] Keep a durable wear-history record with item snapshots and expose it as versioned, downloadable JSON.
 - [x] Keep the existing secure server-side AI stylist for cataloging and weather-aware outfit suggestions.
+- [x] Add School as an occasion in both the private app and GitHub Pages companion.
 
-## Next after this release
+## Future roadmap ideas
 
-- [ ] Add bulk ZIP import with duplicate detection and an approval screen.
-- [ ] Add manual garment editing for category, color, and laundry state.
-- [ ] Add a calendar view and a selector for existing planned outfits.
-- [ ] Optionally configure a dedicated OpenAI API key for ChatGPT-only inference instead of the managed multi-model AI service.
+The following are intentionally deferred product ideas rather than incomplete work in this release: bulk ZIP import with duplicate-review approval; manual garment editing for category, color, and laundry state; a calendar view with existing-outfit selection; and an optional OpenAI API-key provider for ChatGPT-only inference.

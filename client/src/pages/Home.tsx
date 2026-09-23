@@ -66,7 +66,7 @@ type WearHistory = {
 };
 
 const categories = ["all", "tops", "bottoms", "outerwear", "shoes", "accessories"];
-const occasions = ["Everyday", "Office", "Date night", "Weekend", "Travel"];
+const occasions = ["Everyday", "School", "Office", "Date night", "Weekend", "Travel"];
 const goldenCoordinates = { latitude: 39.7555, longitude: -105.2211 };
 
 function localIsoDate() {
