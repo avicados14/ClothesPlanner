@@ -22,7 +22,7 @@ Open **Plan → Download JSON** to create a portable backup containing items, im
 
 ## Current privacy posture
 
-The GitHub Pages application contains no OpenAI key, Manus token, server-side database request, image upload endpoint, or authentication request. Its code can be developed directly in this repository. The previously created managed backend is not used by GitHub Pages or by this local-first interface.
+The GitHub Pages application contains no OpenAI key, provider token, server-side database request, image upload endpoint, or authentication request. Its code can be developed directly in this repository. No backend is used by the local-first interface.
 
 ## Future secure upgrade
 

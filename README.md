@@ -14,7 +14,7 @@ Wearwise is a **local-first, weather-aware wardrobe planner** published from thi
 
 ## Privacy boundary
 
-The GitHub Pages edition does **not** use Manus authentication, a Manus database, Manus file storage, or an OpenAI/ChatGPT key. New garment photos and planning history do not upload to GitHub Pages or a Manus service. See [the local-first architecture guide](LOCAL_FIRST.md) for the exact data boundary, backup instructions, and the route to a future secure server-based upgrade.
+The GitHub Pages edition does **not** use hosted authentication, a remote database, cloud file storage, or an OpenAI/ChatGPT key. New garment photos and planning history do not upload to GitHub Pages or any backend. See [the local-first architecture guide](LOCAL_FIRST.md) for the exact data boundary, backup instructions, and the route to a future secure server-based upgrade.
 
 ## Repository layout
 
