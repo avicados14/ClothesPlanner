@@ -183,7 +183,7 @@ export const wardrobeRouter = router({
             },
             {
               role: "user",
-              content: `Weather: ${input.temperature}°C, ${input.condition}. Occasion: ${input.occasion}. Personal note: ${input.request || "None"}.\n\nWardrobe catalog:\n${catalog}`,
+              content: `Weather: ${input.temperature}°F, ${input.condition}. Occasion: ${input.occasion}. Personal note: ${input.request || "None"}.\n\nWardrobe catalog:\n${catalog}`,
             },
           ],
           response_format: outfitSchema,
@@ -201,7 +201,7 @@ export const wardrobeRouter = router({
           title: "Easy, weather-ready base",
           itemIds: preferred.length >= 2 ? preferred.map((item) => item.id) : items.slice(0, 3).map((item) => item.id),
           rationale: "A simple combination drawn from the pieces you have already cataloged.",
-          layerNote: input.temperature < 15 ? "Bring your warmest outer layer before heading out." : "Keep the silhouette light and comfortable.",
+          layerNote: input.temperature < 59 ? "Bring your warmest outer layer before heading out." : "Keep the silhouette light and comfortable.",
           finishingTouch: "Adjust with your preferred watch, bag, or cap.",
         };
       }

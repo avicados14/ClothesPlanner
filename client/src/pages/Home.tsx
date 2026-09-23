@@ -162,7 +162,7 @@ export default function Home() {
   const [occasion, setOccasion] = useState("Everyday");
   const [stylistNote, setStylistNote] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
-  const [weather, setWeather] = useState<Weather>({ temperature: 18, condition: "Partly cloudy", place: "Your area", updated: false });
+  const [weather, setWeather] = useState<Weather>({ temperature: 64, condition: "Partly cloudy", place: "Your area", updated: false });
   const [outfit, setOutfit] = useState<Outfit | null>(null);
   const itemsQuery = trpc.wardrobe.list.useQuery(undefined, { enabled: isAuthenticated });
   const utils = trpc.useUtils();
@@ -186,7 +186,7 @@ export default function Home() {
     }
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       try {
-        const endpoint = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weather_code&temperature_unit=celsius`;
+        const endpoint = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`;
         const response = await fetch(endpoint);
         const data = await response.json();
         setWeather({ temperature: Math.round(data.current.temperature_2m), condition: weatherLabel(data.current.weather_code), place: "Your location", updated: true });
@@ -237,7 +237,7 @@ export default function Home() {
             <div className="weather-heading"><span>{weatherIcon(weather.condition)}</span><p>Right now <button onClick={refreshWeather} title="Use current location"><LocateFixed className="h-3.5 w-3.5" /></button></p></div>
             <div className="weather-degree">{weather.temperature}<sup>°</sup></div>
             <p className="weather-condition">{weather.condition}<span>·</span>{weather.place}</p>
-            <p className="weather-guidance"><Wind className="h-4 w-4" /> {weather.temperature < 12 ? "A proper layer will earn its keep." : weather.temperature < 20 ? "A light layer will do the job." : "Lightweight pieces are your friend."}</p>
+            <p className="weather-guidance"><Wind className="h-4 w-4" /> {weather.temperature < 54 ? "A proper layer will earn its keep." : weather.temperature < 68 ? "A light layer will do the job." : "Lightweight pieces are your friend."}</p>
           </aside>
         </section>
 
