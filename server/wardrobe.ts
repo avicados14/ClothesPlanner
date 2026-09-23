@@ -1,13 +1,22 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { createWardrobeItem, listWardrobeItemsForUser, removeWardrobeItem } from "./db";
+import {
+  createPlanAndMarkDirty,
+  createWardrobeItem,
+  listWardrobeItemsForUser,
+  listWearHistoryForUser,
+  markAllGarmentsClean,
+  removeWardrobeItem,
+} from "./db";
 import { invokeLLM, listLLMModels } from "./_core/llm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 
 const categories = ["tops", "bottoms", "outerwear", "shoes", "accessories", "one-piece", "activewear", "other"] as const;
 const formalities = ["casual", "smart-casual", "business", "formal", "active"] as const;
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
 const itemAnalysisSchema = {
   type: "json_schema" as const,
   json_schema: {
@@ -117,6 +126,7 @@ async function storeImage(userId: number, fileName: string, mimeType: string, by
 }
 
 export const wardrobeRouter = router({
+  /** Lists all individually numbered garments and their clean/dirty availability. */
   list: protectedProcedure.query(({ ctx }) => listWardrobeItemsForUser(ctx.user.id)),
 
   remove: protectedProcedure
@@ -136,7 +146,7 @@ export const wardrobeRouter = router({
       const stored = await storeImage(ctx.user.id, input.fileName, mimeType, bytes);
       const details = await analyzeGarment(stored.url, input.fileName);
       await createWardrobeItem({ userId: ctx.user.id, imageUrl: stored.url, imageKey: stored.key, ...details });
-      return { ...details, imageUrl: stored.url };
+      return { ...details, imageUrl: stored.url, laundryStatus: "clean" as const };
     }),
 
   importImage: protectedProcedure
@@ -157,20 +167,26 @@ export const wardrobeRouter = router({
       const stored = await storeImage(ctx.user.id, filename, mimeType, bytes);
       const details = await analyzeGarment(stored.url, filename);
       await createWardrobeItem({ userId: ctx.user.id, imageUrl: stored.url, imageKey: stored.key, ...details });
-      return { ...details, imageUrl: stored.url };
+      return { ...details, imageUrl: stored.url, laundryStatus: "clean" as const };
     }),
 
+  /** Suggests outfits exclusively from clean garments. */
   suggest: protectedProcedure
     .input(z.object({
-      temperature: z.number().min(-40).max(60),
+      temperature: z.number().min(-40).max(140),
       condition: z.string().min(1).max(100),
       occasion: z.string().min(1).max(100),
       request: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const items = await listWardrobeItemsForUser(ctx.user.id);
+      const allItems = await listWardrobeItemsForUser(ctx.user.id);
+      const items = allItems.filter((item) => item.laundryStatus === "clean");
       if (items.length < 2) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Add at least two garments before asking for an outfit." });
+        const dirtyCount = allItems.length - items.length;
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: dirtyCount ? "Not enough clean garments for a new look. Run laundry to make your worn pieces available again." : "Add at least two garments before asking for an outfit.",
+        });
       }
       const catalog = items.map((item) => `#${item.id} | ${item.name} | ${item.category} | ${item.primaryColor} | ${item.seasons} | ${item.formality}`).join("\n");
       try {
@@ -179,11 +195,11 @@ export const wardrobeRouter = router({
           messages: [
             {
               role: "system",
-              content: "You are Wearwise, a concise personal stylist. Build a wearable, weather-appropriate outfit from ONLY supplied catalog items. The wardrobe owner is male; offer grounded contemporary menswear, without stereotypes or invented items. Prioritize a complete look (top, bottom, shoes if available), color harmony, and realistic layering. Avoid repeating an item ID. Return only requested JSON.",
+              content: "You are Wearwise, a concise personal stylist. Build a wearable, weather-appropriate outfit from ONLY supplied clean catalog items. The wardrobe owner is male; offer grounded contemporary menswear, without stereotypes or invented items. Prioritize a complete look (top, bottom, shoes if available), color harmony, and realistic layering. Avoid repeating an item ID. Return only requested JSON.",
             },
             {
               role: "user",
-              content: `Weather: ${input.temperature}°F, ${input.condition}. Occasion: ${input.occasion}. Personal note: ${input.request || "None"}.\n\nWardrobe catalog:\n${catalog}`,
+              content: `Weather: ${input.temperature}°F, ${input.condition}. Occasion: ${input.occasion}. Personal note: ${input.request || "None"}.\n\nClean wardrobe catalog:\n${catalog}`,
             },
           ],
           response_format: outfitSchema,
@@ -200,10 +216,42 @@ export const wardrobeRouter = router({
         return {
           title: "Easy, weather-ready base",
           itemIds: preferred.length >= 2 ? preferred.map((item) => item.id) : items.slice(0, 3).map((item) => item.id),
-          rationale: "A simple combination drawn from the pieces you have already cataloged.",
+          rationale: "A simple combination drawn only from the clean pieces you have already cataloged.",
           layerNote: input.temperature < 59 ? "Bring your warmest outer layer before heading out." : "Keep the silhouette light and comfortable.",
           finishingTouch: "Adjust with your preferred watch, bag, or cap.",
         };
       }
     }),
+
+  /** Creates a dated wear-history entry and marks its exact garment IDs dirty. */
+  plan: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1).max(160),
+      itemIds: z.array(z.number().int().positive()).min(2).max(8).refine((ids) => new Set(ids).size === ids.length, "Choose each garment only once."),
+      rationale: z.string().max(1500).default(""),
+      occasion: z.string().min(1).max(100),
+      note: z.string().max(500).optional(),
+      planDate: z.string().regex(datePattern, "Use a YYYY-MM-DD date."),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await createPlanAndMarkDirty(ctx.user.id, input);
+        return { success: true as const, ...result };
+      } catch (error) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: error instanceof Error ? error.message : "This outfit could not be planned." });
+      }
+    }),
+
+  /** One explicit reset for the whole closet after a laundry load. */
+  laundry: protectedProcedure.mutation(async ({ ctx }) => {
+    await markAllGarmentsClean(ctx.user.id);
+    return { success: true as const };
+  }),
+
+  /** Versioned, export-ready JSON that refreshes every time a plan is added. */
+  history: protectedProcedure.query(async ({ ctx }) => ({
+    version: "wearwise.wear-history/v1",
+    generatedAt: new Date().toISOString(),
+    entries: await listWearHistoryForUser(ctx.user.id),
+  })),
 });

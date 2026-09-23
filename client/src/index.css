@@ -178,6 +178,45 @@ footer p { margin: 0; }
 .link-import label { font-size: 12px; color: #57665d; }
 .processing-line { color: #597165; font-size: 12px; display: flex; align-items: center; gap: 7px; }
 
+.outfit-actions { display: flex; align-items: center; gap: 9px; margin-top: 20px; flex-wrap: wrap; }
+.outfit-actions label { font: 10px "DM Mono", monospace; letter-spacing: .07em; text-transform: uppercase; color: #b9cdc0; }
+.outfit-actions input { width: 142px; height: 36px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1); color: #fffdf9; font-size: 12px; }
+.outfit-actions input::-webkit-calendar-picker-indicator { filter: invert(1); }
+.plan-button { height: 36px; background: #f1d8da; color: #553138; border-radius: 2px; font-size: 12px; }
+.plan-button:hover { background: #fff5f5; }
+.closet-actions { display: flex; gap: 10px; align-items: center; }
+.laundry-button { border-color: #b5c8b8; color: #315d4e; background: #f8fbf7; height: 40px; font-size: 13px; }
+.laundry-button:hover { background: #e5f0e6; color: #1e4639; }
+.laundry-summary { margin-top: 25px; padding: 12px 14px; background: #eef3ed; color: #466354; display: flex; align-items: center; gap: 8px; font-size: 12px; border-left: 3px solid #91ad98; }
+.laundry-summary svg { color: #426c50; }
+.laundry-summary p { margin: 0 0 0 auto; color: #718079; font-size: 11px; }
+.item-id { position: absolute; top: 9px; left: 9px; z-index: 2; color: #315243; background: rgba(255,255,255,.86); padding: 3px 5px; font: 10px "DM Mono", monospace; border-radius: 2px; }
+.item-dirty .item-visual:before { content: "In laundry"; position: absolute; z-index: 3; top: 38px; left: 9px; color: white; background: #a65060; font-size: 10px; padding: 4px 6px; border-radius: 2px; text-transform: uppercase; letter-spacing: .05em; }
+.item-dirty .item-visual img { filter: saturate(.54) brightness(.93); }
+.status-word { font-weight: 700; }
+.status-clean { color: #427456; }
+.status-dirty { color: #a6515f; }
+.history-section { padding: 40px 0 48px; }
+.history-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.history-heading .section-kicker { display: flex; align-items: center; gap: 6px; color: #68736c; margin: 0 0 10px; }
+.history-heading h2 { color: #20352e; margin: 0; font: 400 41px/1 "Instrument Serif", Georgia, serif; letter-spacing: -1.4px; }
+.history-download { height: 39px; background: #fffdf9; color: #345447; border-color: #bacbbd; font-size: 12px; }
+.history-list { display: grid; gap: 12px; margin-top: 29px; }
+.history-card { display: grid; grid-template-columns: 160px minmax(0,1fr) 240px; gap: 24px; align-items: center; background: rgba(255,255,255,.43); padding: 17px; border: 1px solid #dde1d8; }
+.history-meta { display: grid; gap: 5px; font: 10px "DM Mono", monospace; letter-spacing: .06em; color: #536a5e; text-transform: uppercase; }
+.history-meta span:last-child { color: #a95d68; }
+.history-copy h3 { margin: 0 0 6px; font: 400 25px/1 "Instrument Serif", Georgia, serif; color: #2c463b; }
+.history-copy p { color: #66736b; font-size: 12px; line-height: 1.45; margin: 0; }
+.history-copy small { color: #936069; display: block; margin-top: 7px; font-size: 11px; }
+.history-items { display: flex; justify-content: flex-end; gap: 5px; min-width: 0; }
+.history-item { width: 56px; height: 68px; position: relative; background: #eaece5; }
+.history-item img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+.history-item span { position: absolute; bottom: 2px; left: 3px; font: 9px "DM Mono", monospace; color: white; text-shadow: 0 1px 2px #333; }
+.history-empty { min-height: 190px; border: 1px dashed #cad2ca; margin-top: 26px; display: grid; place-content: center; justify-items: center; gap: 8px; text-align: center; padding: 30px; color: #718079; }
+.history-empty svg { color: #b95f6d; }
+.history-empty h3 { margin: 0; font: 400 27px "Instrument Serif", Georgia, serif; color: #2e463c; }
+.history-empty p { max-width: 480px; font-size: 13px; line-height: 1.55; margin: 0; }
+
 @media (max-width: 780px) {
   .topbar { height: 62px; padding: 0 18px; }
   .brand { font-size: 25px; }
@@ -206,11 +245,24 @@ footer p { margin: 0; }
   .closet-section { padding: 61px 0 30px; }
   .closet-heading { align-items: start; }
   .closet-heading .primary-action { margin-top: 4px; }
+  .closet-actions { display: grid; gap: 7px; justify-items: end; }
+  .laundry-button { height: 35px; font-size: 11px; }
   .primary-action { white-space: nowrap; padding-inline: 11px; }
   .closet-toolbar > p { display: none; }
+  .laundry-summary { align-items: start; flex-wrap: wrap; }
+  .laundry-summary p { flex-basis: 100%; margin: 0; }
   .filter-tabs { gap: 17px; }
   .closet-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
   .item-menu { opacity: 1; transform: none; }
+  .history-section { padding: 33px 0 25px; }
+  .history-heading h2 { font-size: 36px; }
+  .history-download { font-size: 0; width: 40px; padding: 0; }
+  .history-download svg { margin: 0; }
+  .history-card { grid-template-columns: 1fr; gap: 12px; padding: 15px; }
+  .history-items { justify-content: flex-start; }
+  .outfit-actions { align-items: start; display: grid; grid-template-columns: 1fr 1fr; }
+  .outfit-actions label { grid-column: 1 / -1; }
+  .outfit-actions input, .outfit-actions button { width: 100%; }
   .method-panel { margin-top: 20px; padding: 34px 25px; grid-template-columns: 1fr; gap: 27px; border-radius: 28px 4px 28px 4px; }
   footer { padding: 19px 18px 25px; gap: 12px; }
   footer p { display: none; }

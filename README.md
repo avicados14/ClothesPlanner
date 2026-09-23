@@ -7,6 +7,8 @@ Wearwise is a private, weather-aware digital wardrobe planner. Add photographs o
 - **Personal wardrobe**: Manus OAuth keeps each wardrobe private, while images are stored securely in project storage rather than the database.
 - **Photo and product-link import**: Add a garment from a device image or a public, direct image URL. AI suggests a practical name, category, color, season, and formality.
 - **Weather-aware styling**: Use device location to obtain current conditions in **Fahrenheit**, then request a look for everyday wear, the office, a date night, weekend, or travel.
+- **Laundry-aware planning**: Every garment has a stable numerical ID and a clean/dirty state. Adding an AI look to a date marks exactly those pieces dirty, and the stylist excludes them until the explicit Laundry reset is used.
+- **Wear history**: Each planned look is retained as a dated immutable snapshot and is available as versioned, downloadable JSON.
 - **Responsive workspace**: The experience is designed for a phone first but remains comfortable on a larger screen.
 
 ## GitHub Pages companion

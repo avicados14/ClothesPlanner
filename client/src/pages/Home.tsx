@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
-  ArrowUpRight, CloudDrizzle, CloudSun, Footprints, ImagePlus, Loader2, LocateFixed,
-  Menu, MoreHorizontal, Plus, Shirt, Sparkles, SunMedium, Trash2, Upload, WandSparkles, Wind,
+  ArrowUpRight, CalendarCheck, CheckCircle2, ClipboardList, CloudDrizzle, CloudSun, Download,
+  Footprints, ImagePlus, Loader2, LocateFixed, Menu, MoreHorizontal, Plus, RefreshCcw,
+  Shirt, Sparkles, SunMedium, Trash2, Upload, WandSparkles, Wind,
 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
@@ -29,6 +29,8 @@ type WardrobeItem = {
   primaryColor: string;
   seasons: string;
   formality: string;
+  laundryStatus: "clean" | "dirty";
+  lastLaunderedAt: Date | null;
 };
 
 type Outfit = {
@@ -39,9 +41,38 @@ type Outfit = {
   finishingTouch: string;
 };
 
+type HistoryItem = {
+  id: number;
+  name: string;
+  category: string;
+  primaryColor: string;
+  imageUrl: string;
+};
+
+type WearHistoryEntry = {
+  planId: number;
+  planDate: string;
+  occasion: string | null;
+  note: string | null;
+  title: string;
+  rationale: string | null;
+  items: HistoryItem[];
+};
+
+type WearHistory = {
+  version: string;
+  generatedAt: string;
+  entries: WearHistoryEntry[];
+};
+
 const categories = ["all", "tops", "bottoms", "outerwear", "shoes", "accessories"];
 const occasions = ["Everyday", "Office", "Date night", "Weekend", "Travel"];
 const goldenCoordinates = { latitude: 39.7555, longitude: -105.2211 };
+
+function localIsoDate() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 function weatherLabel(code: number) {
   if ([0, 1].includes(code)) return "Clear skies";
@@ -60,19 +91,21 @@ function weatherIcon(condition: string) {
 }
 
 function ItemCard({ item, onDelete }: { item: WardrobeItem; onDelete: (id: number) => void }) {
+  const dirty = item.laundryStatus === "dirty";
   return (
-    <article className="item-card group">
+    <article className={cn("item-card group", dirty && "item-dirty")}>
       <div className="item-visual">
         <img src={item.imageUrl} alt={item.name} loading="lazy" />
         <button className="item-menu" onClick={() => onDelete(item.id)} aria-label={`Remove ${item.name}`} title="Remove item">
           <Trash2 className="h-4 w-4" />
         </button>
+        <span className="item-id">#{item.id}</span>
         <span className="item-color"><span className="color-dot" />{item.primaryColor}</span>
       </div>
       <div className="item-caption">
         <div>
           <h3>{item.name}</h3>
-          <p>{item.category.replace("-", " ")}</p>
+          <p>{item.category.replace("-", " ")} · <span className={cn("status-word", dirty ? "status-dirty" : "status-clean")}>{dirty ? "in laundry" : "clean"}</span></p>
         </div>
         <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
       </div>
@@ -86,7 +119,7 @@ function UploadDialog({ onUploaded }: { onUploaded: () => void }) {
   const [imageUrl, setImageUrl] = useState("");
   const upload = trpc.wardrobe.upload.useMutation({
     onSuccess: (item) => {
-      toast.success(`${item.name} added to your closet`);
+      toast.success(`${item.name} added to your closet as clean`);
       onUploaded();
       setOpen(false);
     },
@@ -95,7 +128,7 @@ function UploadDialog({ onUploaded }: { onUploaded: () => void }) {
   });
   const importImage = trpc.wardrobe.importImage.useMutation({
     onSuccess: (item) => {
-      toast.success(`${item.name} added to your closet`);
+      toast.success(`${item.name} added to your closet as clean`);
       onUploaded();
       setOpen(false);
     },
@@ -135,7 +168,7 @@ function UploadDialog({ onUploaded }: { onUploaded: () => void }) {
       <DialogContent className="upload-dialog">
         <DialogHeader>
           <DialogTitle>Add to your closet</DialogTitle>
-          <DialogDescription>Upload a garment photo or paste a direct product image. Wearwise will suggest the essentials automatically.</DialogDescription>
+          <DialogDescription>Upload a garment photo or paste a direct product image. Wearwise catalogs it with AI and adds it as clean.</DialogDescription>
         </DialogHeader>
         <div className="upload-choices">
           <label className={cn("upload-dropzone", pending && "pointer-events-none opacity-60")}>
@@ -162,23 +195,44 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [occasion, setOccasion] = useState("Everyday");
   const [stylistNote, setStylistNote] = useState("");
+  const [planDate, setPlanDate] = useState(localIsoDate);
   const [mobileNav, setMobileNav] = useState(false);
   const [weather, setWeather] = useState<Weather>({ temperature: 64, condition: "Partly cloudy", place: "Golden, CO", updated: false });
   const [outfit, setOutfit] = useState<Outfit | null>(null);
   const itemsQuery = trpc.wardrobe.list.useQuery(undefined, { enabled: isAuthenticated });
+  const historyQuery = trpc.wardrobe.history.useQuery(undefined, { enabled: isAuthenticated });
   const utils = trpc.useUtils();
   const deleteItem = trpc.wardrobe.remove.useMutation({
-    onSuccess: () => { toast.success("Item removed from your closet"); utils.wardrobe.list.invalidate(); },
+    onSuccess: () => { toast.success("Item removed from your closet"); void utils.wardrobe.list.invalidate(); },
     onError: (error) => toast.error(error.message),
   });
   const suggest = trpc.wardrobe.suggest.useMutation({
     onSuccess: (suggestion) => setOutfit(suggestion),
     onError: (error) => toast.error(error.message),
   });
+  const planOutfit = trpc.wardrobe.plan.useMutation({
+    onSuccess: () => {
+      toast.success("Look added to your plan. Its garments are now in laundry.");
+      setOutfit(null);
+      void utils.wardrobe.list.invalidate();
+      void utils.wardrobe.history.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const runLaundry = trpc.wardrobe.laundry.useMutation({
+    onSuccess: () => {
+      toast.success("Laundry is done. Every garment is clean and available again.");
+      void utils.wardrobe.list.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const items = (itemsQuery.data || []) as WardrobeItem[];
+  const history = historyQuery.data as WearHistory | undefined;
   const filteredItems = activeCategory === "all" ? items : items.filter((item) => item.category === activeCategory);
   const lookItems = useMemo(() => outfit ? items.filter((item) => outfit.itemIds.includes(item.id)) : [], [items, outfit]);
+  const cleanCount = items.filter((item) => item.laundryStatus === "clean").length;
+  const dirtyCount = items.length - cleanCount;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -222,6 +276,31 @@ export default function Home() {
     suggest.mutate({ temperature: weather.temperature, condition: weather.condition, occasion, request: stylistNote.trim() || undefined });
   };
 
+  const addToPlan = () => {
+    if (!outfit) return;
+    planOutfit.mutate({
+      title: outfit.title,
+      itemIds: outfit.itemIds,
+      rationale: outfit.rationale,
+      occasion,
+      note: stylistNote.trim() || undefined,
+      planDate,
+    });
+  };
+
+  const downloadHistory = () => {
+    if (!history) return;
+    const json = JSON.stringify(history, null, 2);
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "wearwise-wear-history.json";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const scrollTo = (id: string) => {
     setMobileNav(false);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -235,7 +314,7 @@ export default function Home() {
           <button className="nav-active" onClick={() => scrollTo("today")}>Today</button>
           <button onClick={() => scrollTo("closet")}>Closet</button>
           <button onClick={() => scrollTo("stylist")}>Stylist</button>
-          <button onClick={() => toast.message("Planning is next on the roadmap. Your saved outfits will appear here.")}>Plan</button>
+          <button onClick={() => scrollTo("plan")}>Plan</button>
         </nav>
         <div className="header-actions">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isAuthenticated ? <button className="profile-button" onClick={() => logout()} title="Sign out"><span>{(user?.name || "Y").slice(0, 1).toUpperCase()}</span><span className="profile-label">{user?.name?.split(" ")[0] || "Your closet"}</span></button> : <Button variant="ghost" className="sign-in-button" onClick={startLogin}>Sign in</Button>}
@@ -252,14 +331,14 @@ export default function Home() {
           </div>
           <aside className="weather-card">
             <div className="weather-heading"><span>{weatherIcon(weather.condition)}</span><p>Right now <button onClick={refreshWeather} title="Use current location"><LocateFixed className="h-3.5 w-3.5" /></button></p></div>
-            <div className="weather-degree">{weather.temperature}<sup>°</sup></div>
+            <div className="weather-degree">{weather.temperature}<sup>°F</sup></div>
             <p className="weather-condition">{weather.condition}<span>·</span>{weather.place}</p>
             <p className="weather-guidance"><Wind className="h-4 w-4" /> {weather.temperature < 54 ? "A proper layer will earn its keep." : weather.temperature < 68 ? "A light layer will do the job." : "Lightweight pieces are your friend."}</p>
           </aside>
         </section>
 
         <section id="stylist" className="stylist-stage">
-          <div className="section-heading"><div><p className="section-kicker"><Sparkles className="h-3.5 w-3.5" />Wearwise stylist</p><h2>A good place to start.</h2></div><p>Tell it where you’re going. It will work with what you own.</p></div>
+          <div className="section-heading"><div><p className="section-kicker"><Sparkles className="h-3.5 w-3.5" />Wearwise AI stylist</p><h2>A good place to start.</h2></div><p>It sees only your clean pieces, so every suggestion is ready to wear.</p></div>
           <div className="stylist-controls">
             <div className="occasion-tabs" role="list" aria-label="Occasion">
               {occasions.map((name) => <button role="listitem" key={name} onClick={() => setOccasion(name)} className={cn(occasion === name && "selected")}>{name}</button>)}
@@ -273,27 +352,33 @@ export default function Home() {
 
           {outfit ? (
             <div className="outfit-result">
-              <div className="outfit-copy"><p className="section-kicker"><Sparkles className="h-3.5 w-3.5" />Suggested for {occasion.toLowerCase()}</p><h3>{outfit.title}</h3><p>{outfit.rationale}</p><div className="outfit-notes"><span><CloudSun className="h-4 w-4" />{outfit.layerNote}</span><span><Footprints className="h-4 w-4" />{outfit.finishingTouch}</span></div></div>
+              <div className="outfit-copy"><p className="section-kicker"><Sparkles className="h-3.5 w-3.5" />Suggested for {occasion.toLowerCase()}</p><h3>{outfit.title}</h3><p>{outfit.rationale}</p><div className="outfit-notes"><span><CloudSun className="h-4 w-4" />{outfit.layerNote}</span><span><Footprints className="h-4 w-4" />{outfit.finishingTouch}</span></div><div className="outfit-actions"><Label htmlFor="plan-date">Wear date</Label><Input id="plan-date" type="date" value={planDate} onChange={(event) => setPlanDate(event.target.value)} /><Button onClick={addToPlan} disabled={planOutfit.isPending} className="plan-button">{planOutfit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarCheck className="h-4 w-4" />} Add to plan</Button></div></div>
               <div className="outfit-strip">{lookItems.map((item) => <img key={item.id} src={item.imageUrl} alt={item.name} />)}</div>
             </div>
           ) : (
-            <div className="stylist-empty"><div className="stylist-empty-illustration"><Shirt /><Plus /><Footprints /></div><div><h3>Your next outfit starts here.</h3><p>{items.length ? "Ask the stylist for a weather-aware look built from your cataloged pieces." : "Add a few pieces to your closet, then let the stylist build a look around your day."}</p></div></div>
+            <div className="stylist-empty"><div className="stylist-empty-illustration"><Shirt /><Plus /><Footprints /></div><div><h3>Your next outfit starts here.</h3><p>{items.length ? `${cleanCount} clean ${cleanCount === 1 ? "piece is" : "pieces are"} ready for a weather-aware look. Planned garments automatically move to laundry.` : "Add a few pieces to your closet, then let the stylist build a look around your day."}</p></div></div>
           )}
         </section>
 
         <section id="closet" className="closet-section">
-          <div className="closet-heading"><div><p className="section-kicker"><Shirt className="h-3.5 w-3.5" />Your closet</p><h2>The pieces in rotation.</h2></div>{isAuthenticated ? <UploadDialog onUploaded={() => utils.wardrobe.list.invalidate()} /> : <Button className="primary-action" onClick={startLogin}><Plus className="h-4 w-4" /> Start your closet</Button>}</div>
+          <div className="closet-heading"><div><p className="section-kicker"><Shirt className="h-3.5 w-3.5" />Your closet</p><h2>The pieces in rotation.</h2></div>{isAuthenticated ? <div className="closet-actions"><Button variant="outline" className="laundry-button" onClick={() => runLaundry.mutate()} disabled={runLaundry.isPending || !dirtyCount}>{runLaundry.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Laundry {dirtyCount ? `(${dirtyCount})` : "done"}</Button><UploadDialog onUploaded={() => void utils.wardrobe.list.invalidate()} /></div> : <Button className="primary-action" onClick={startLogin}><Plus className="h-4 w-4" /> Start your closet</Button>}</div>
+          <div className="laundry-summary"><CheckCircle2 className="h-4 w-4" /><span><strong>{cleanCount}</strong> clean · <strong>{dirtyCount}</strong> in laundry</span><p>Every item has a permanent numerical ID. Items selected in a plan are marked dirty until you run laundry.</p></div>
           <div className="closet-toolbar"><div className="filter-tabs" aria-label="Filter closet by category">{categories.map((category) => <button key={category} onClick={() => setActiveCategory(category)} className={cn(activeCategory === category && "active")}>{category === "all" ? "Everything" : category}</button>)}</div><p>{isAuthenticated ? `${items.length} ${items.length === 1 ? "piece" : "pieces"}` : "A private closet, on your terms."}</p></div>
 
-          {itemsQuery.isLoading ? <div className="closet-loading"><Loader2 className="h-5 w-5 animate-spin" />Loading your closet…</div> : !isAuthenticated ? <div className="closet-empty"><ImagePlus className="h-7 w-7" /><h3>Build your visual wardrobe.</h3><p>Sign in to safely add clothing from your phone, computer, or favourite store. AI gives each item a practical starting label you can refine later.</p><Button onClick={startLogin}>Sign in to begin</Button></div> : filteredItems.length ? <div className="closet-grid">{filteredItems.map((item) => <ItemCard key={item.id} item={item} onDelete={(id) => deleteItem.mutate({ id })} />)}</div> : <div className="closet-empty"><ImagePlus className="h-7 w-7" /><h3>{items.length ? "Nothing in this category yet." : "Start with what you’re wearing today."}</h3><p>{items.length ? "Try another filter or add a new piece." : "A top, a bottom, and shoes are enough to make the stylist useful. There’s no need to catalog everything at once."}</p><UploadDialog onUploaded={() => utils.wardrobe.list.invalidate()} /></div>}
+          {itemsQuery.isLoading ? <div className="closet-loading"><Loader2 className="h-5 w-5 animate-spin" />Loading your closet…</div> : !isAuthenticated ? <div className="closet-empty"><ImagePlus className="h-7 w-7" /><h3>Build your visual wardrobe.</h3><p>Sign in to safely add clothing from your phone, computer, or favourite store. AI gives each item a practical starting label you can refine later.</p><Button onClick={startLogin}>Sign in to begin</Button></div> : filteredItems.length ? <div className="closet-grid">{filteredItems.map((item) => <ItemCard key={item.id} item={item} onDelete={(id) => deleteItem.mutate({ id })} />)}</div> : <div className="closet-empty"><ImagePlus className="h-7 w-7" /><h3>{items.length ? "Nothing in this category yet." : "Start with what you’re wearing today."}</h3><p>{items.length ? "Try another filter or add a new piece." : "A top, a bottom, and shoes are enough to make the stylist useful. There’s no need to catalog everything at once."}</p><UploadDialog onUploaded={() => void utils.wardrobe.list.invalidate()} /></div>}
+        </section>
+
+        <section id="plan" className="history-section">
+          <div className="history-heading"><div><p className="section-kicker"><ClipboardList className="h-3.5 w-3.5" />Wear history</p><h2>What you planned.</h2></div>{isAuthenticated && history?.entries.length ? <Button variant="outline" className="history-download" onClick={downloadHistory}><Download className="h-4 w-4" /> Download JSON</Button> : null}</div>
+          {!isAuthenticated ? <div className="history-empty"><ClipboardList className="h-6 w-6" /><p>Sign in to keep a private, exportable record of every planned outfit.</p></div> : historyQuery.isLoading ? <div className="history-empty"><Loader2 className="h-5 w-5 animate-spin" /><p>Loading your planning history…</p></div> : history?.entries.length ? <div className="history-list">{history.entries.map((entry) => <article className="history-card" key={entry.planId}><div className="history-meta"><span>{new Date(`${entry.planDate}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</span><span>{entry.occasion || "Planned look"}</span></div><div className="history-copy"><h3>{entry.title}</h3><p>{entry.rationale}</p>{entry.note ? <small>Note: {entry.note}</small> : null}</div><div className="history-items">{entry.items.map((item) => <div key={item.id} className="history-item"><img src={item.imageUrl} alt={item.name} /><span>#{item.id}</span></div>)}</div></article>)}</div> : <div className="history-empty"><ClipboardList className="h-6 w-6" /><h3>Your planning record will appear here.</h3><p>Choose an AI look, add it to a date, and Wearwise will log the outfit as JSON while moving those exact pieces into laundry.</p></div>}
         </section>
 
         <section className="method-panel">
           <div><p className="section-kicker"><Sparkles className="h-3.5 w-3.5" />Made for real wardrobes</p><h2>Less scrolling. More wearing.</h2></div>
-          <div className="method-points"><p><strong>Private by default.</strong> Your wardrobe stays tied to your account.</p><p><strong>Start small.</strong> Add what you reach for now; bulk folder import comes next.</p><p><strong>Weather-aware.</strong> Recommendations account for the temperature and your plans.</p></div>
+          <div className="method-points"><p><strong>Private by default.</strong> Your wardrobe stays tied to your account.</p><p><strong>Clean-only planning.</strong> Planned pieces stay out of recommendations until laundry is complete.</p><p><strong>AI-assisted.</strong> Cataloging and recommendations use the secure server-side stylist.</p></div>
         </section>
       </main>
-      <footer><span>Wearwise</span><p>A personal wardrobe companion, built around your real life.</p><span>v0.1</span></footer>
+      <footer><span>Wearwise</span><p>A personal wardrobe companion, built around your real life.</p><span>v0.2</span></footer>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
-/** Core user table backing the Manus OAuth flow. */
+/** Core user table backing auth flow. */
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
@@ -13,6 +13,7 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+/** A numbered, user-owned garment. IDs are stable and are used in plans and history. */
 export const wardrobeItems = mysqlTable("wardrobeItems", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
@@ -23,20 +24,26 @@ export const wardrobeItems = mysqlTable("wardrobeItems", {
   primaryColor: varchar("primaryColor", { length: 64 }).default("Unknown").notNull(),
   seasons: varchar("seasons", { length: 120 }).default("all-season").notNull(),
   formality: mysqlEnum("formality", ["casual", "smart-casual", "business", "formal", "active"]).default("casual").notNull(),
+  /** Dirty items are never eligible for new outfit recommendations. */
+  laundryStatus: mysqlEnum("laundryStatus", ["clean", "dirty"]).default("clean").notNull(),
+  lastLaunderedAt: timestamp("lastLaunderedAt"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+/** A durable outfit record with an item snapshot so historical plans remain readable. */
 export const savedOutfits = mysqlTable("savedOutfits", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
   title: varchar("title", { length: 160 }).notNull(),
   itemIds: text("itemIds").notNull(),
+  itemSnapshot: text("itemSnapshot").notNull(),
   rationale: text("rationale"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/** A dated commitment to wear a saved outfit. Each row is a wear-history event. */
 export const outfitPlans = mysqlTable("outfitPlans", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
