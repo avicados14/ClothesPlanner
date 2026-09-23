@@ -41,6 +41,7 @@ type Outfit = {
 
 const categories = ["all", "tops", "bottoms", "outerwear", "shoes", "accessories"];
 const occasions = ["Everyday", "Office", "Date night", "Weekend", "Travel"];
+const goldenCoordinates = { latitude: 39.7555, longitude: -105.2211 };
 
 function weatherLabel(code: number) {
   if ([0, 1].includes(code)) return "Clear skies";
@@ -162,7 +163,7 @@ export default function Home() {
   const [occasion, setOccasion] = useState("Everyday");
   const [stylistNote, setStylistNote] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
-  const [weather, setWeather] = useState<Weather>({ temperature: 64, condition: "Partly cloudy", place: "Your area", updated: false });
+  const [weather, setWeather] = useState<Weather>({ temperature: 64, condition: "Partly cloudy", place: "Golden, CO", updated: false });
   const [outfit, setOutfit] = useState<Outfit | null>(null);
   const itemsQuery = trpc.wardrobe.list.useQuery(undefined, { enabled: isAuthenticated });
   const utils = trpc.useUtils();
@@ -179,9 +180,25 @@ export default function Home() {
   const filteredItems = activeCategory === "all" ? items : items.filter((item) => item.category === activeCategory);
   const lookItems = useMemo(() => outfit ? items.filter((item) => outfit.itemIds.includes(item.id)) : [], [items, outfit]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadGoldenWeather = async () => {
+      try {
+        const endpoint = `https://api.open-meteo.com/v1/forecast?latitude=${goldenCoordinates.latitude}&longitude=${goldenCoordinates.longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`;
+        const response = await fetch(endpoint, { signal: controller.signal });
+        const data = await response.json();
+        setWeather({ temperature: Math.round(data.current.temperature_2m), condition: weatherLabel(data.current.weather_code), place: "Golden, CO", updated: true });
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") console.warn("[Weather] Golden forecast unavailable", error);
+      }
+    };
+    void loadGoldenWeather();
+    return () => controller.abort();
+  }, []);
+
   const refreshWeather = () => {
     if (!navigator.geolocation) {
-      toast.message("Location isn’t available in this browser; using a comfortable default.");
+      toast.message("Location isn’t available in this browser; weather remains set to Golden, CO.");
       return;
     }
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
@@ -189,7 +206,7 @@ export default function Home() {
         const endpoint = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`;
         const response = await fetch(endpoint);
         const data = await response.json();
-        setWeather({ temperature: Math.round(data.current.temperature_2m), condition: weatherLabel(data.current.weather_code), place: "Your location", updated: true });
+        setWeather({ temperature: Math.round(data.current.temperature_2m), condition: weatherLabel(data.current.weather_code), place: "Your current location", updated: true });
         toast.success("Weather updated for your location");
       } catch {
         toast.error("Weather could not be refreshed right now.");
